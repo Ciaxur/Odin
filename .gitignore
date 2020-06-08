@@ -1,0 +1,6 @@
+# Project Related
+.vscode
+node_modules
+
+# Build Directories
+out
