@@ -1,5 +1,7 @@
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
+import * as cors from 'cors';
+import * as rateLimit from 'express-rate-limit';
 import { Control, Discovery } from 'magic-home';
 import { BulbRequest, validateBulbRequest } from './Components/Bulb';
 
@@ -8,7 +10,11 @@ const app = express();
 app.use(bodyParser.json({
     type: 'application/json'
 }))
-
+app.use(cors());
+app.use(rateLimit({
+    windowMs: 1000,         // 1 Second
+    max: 5                  // limit each IP to 100 requests per windowMs
+}));  // Setup Request Limiter
 
 // Default Response Interface
 interface Response {
@@ -58,9 +64,32 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
     }
 });
 
-app.get('/lights', (req, res) => {      // Get Available Light Bulbs
-    Discovery.scan(500)
-        .then(dev => res.send(dev));
+app.get('/lights', (_, response) => {      // Get Available Light Bulbs
+    Discovery.scan(255).then(res => {
+        // Query up Promises for each Address Found
+        const devData = [];
+        const queries = [];
+        for (const dev of res) {
+            devData.push({ address: dev.address });
+            queries.push(new Control(dev.address).queryState());
+        }
+
+        // Compile all Results into a single Object Array
+        Promise.all(queries).then(res => {
+            for (const i in res) {
+                devData[i] = {
+                    address: devData[i].address,
+                    power: res[i].on,
+                    color: res[i].color,
+                    warm_white: res[i].warm_white,
+                    cold_white: res[i].cold_white
+                };
+            }
+
+            // Respond back
+            response.send(devData);
+        });
+    });
 });
 
 
