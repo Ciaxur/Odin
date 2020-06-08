@@ -65,31 +65,36 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
 });
 
 app.get('/lights', (_, response) => {      // Get Available Light Bulbs
-    Discovery.scan(255).then(res => {
-        // Query up Promises for each Address Found
-        const devData = [];
-        const queries = [];
-        for (const dev of res) {
-            devData.push({ address: dev.address });
-            queries.push(new Control(dev.address).queryState());
-        }
-
-        // Compile all Results into a single Object Array
-        Promise.all(queries).then(res => {
-            for (const i in res) {
-                devData[i] = {
-                    address: devData[i].address,
-                    power: res[i].on,
-                    color: res[i].color,
-                    warm_white: res[i].warm_white,
-                    cold_white: res[i].cold_white
-                };
+    try {
+        Discovery.scan(255).then(res => {
+            // Query up Promises for each Address Found
+            const devData = [];
+            const queries = [];
+            for (const dev of res) {
+                devData.push({ address: dev.address });
+                queries.push(new Control(dev.address).queryState());
             }
 
-            // Respond back
-            response.send(devData);
+            // Compile all Results into a single Object Array
+            Promise.all(queries).then(res => {
+                for (const i in res) {
+                    devData[i] = {
+                        address: devData[i].address,
+                        power: res[i].on,
+                        color: res[i].color,
+                        warm_white: res[i].warm_white,
+                        cold_white: res[i].cold_white
+                    };
+                }
+
+                // Respond back
+                response.send(devData);
+            });
         });
-    });
+    }
+    catch(e) {
+        console.log("Disocvery Failed: ", e);
+    }
 });
 
 
