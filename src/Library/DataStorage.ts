@@ -6,6 +6,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+interface BulbInfo {
+    address: string,
+    name: string,
+};
+
 class DataStorage {
 
     /**
@@ -42,4 +47,4 @@ class DataStorage {
     }
 };
 
-export { DataStorage };
+export { DataStorage, BulbInfo };

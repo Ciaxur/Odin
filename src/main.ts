@@ -13,7 +13,7 @@ import * as util from 'util';
 import { Control } from 'magic-home';
 import MagicLight from './Library/MagicLight';
 import Discovery from './Discovery';
-import { DataStorage } from './Library/DataStorage';
+import { DataStorage, BulbInfo } from './Library/DataStorage';
 import { BulbRequest, validateBulbRequest } from './Components/Bulb';
 require('dotenv').config();
 
@@ -35,11 +35,6 @@ app.use(morgan('tiny', { stream: fileStream }));
 interface Response {
     message: any,
     code: number
-};
-
-interface BulbInfo {
-    address: string,
-    name: string,
 };
 
 interface ConfigRequest {
