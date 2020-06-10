@@ -33,8 +33,19 @@ app.use(morgan('tiny', { stream: fileStream }));
 
 // Default Response Interface
 interface Response {
-    message: string,
+    message: any,
     code: number
+};
+
+interface BulbInfo {
+    address: string,
+    name: string,
+};
+
+interface ConfigRequest {
+    configure: 'name',          // What to Configure
+    address: string,            // Address of Bulb to Configure
+    value: string,              // Value to Configure
 };
 
 // HashMap of Stored Bulbs based on IP
@@ -52,6 +63,44 @@ app.get('/', (request, response) => {   // DEBUG: Debug Request Body
     });
 });
 
+app.post('/config', (req, res) => {     // Configure Bulb Information
+    const request: ConfigRequest = req.body;
+
+    // Check Configuration Request
+    if (request.configure === 'name') { // Request to Modify the Name of a Bulb
+        // Validation & Update Bulb Alias Name
+        if ((request.address && typeof request.address === 'string') &&
+            (request.value   && typeof request.value === 'string')) {
+                storedBulbInfo[request.address] = {
+                    address: request.address,
+                    name: request.value,
+                } as BulbInfo;
+            }
+            
+    }
+
+    // Update File Storage
+    DataStorage.updateBulbData(storedBulbInfo);
+
+    // Respond
+    res.json({
+        message: "Successfuly Configured!",
+        code: 200
+    } as Response);
+});
+
+app.get('/config', (_, res) => {        // Returns the Stored Configuration
+    // Compile Stored Config into Readable Array
+    const config = [];
+    for(const key of Object.keys(storedBulbInfo))
+        config.push(storedBulbInfo[key]);
+
+    // Respond with Configuration Info
+    res.json({
+        message: config,
+        code: 200
+    } as Response);
+});
 
 app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
     if(validateBulbRequest(req.body)) {
@@ -87,7 +136,7 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
             } as Response);
         }
 
-        res.send({
+        res.json({
             code: 200,
             message: "Request Success!"
         } as Response);
