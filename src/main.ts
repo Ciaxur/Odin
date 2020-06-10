@@ -1,8 +1,16 @@
+/**
+ * Mjölnir Central Processing
+ *  - Takes care of all Requests from Nodes
+ *      and outside requests to send TO the Nodes
+ */
+
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
 import * as cors from 'cors';
 import * as rateLimit from 'express-rate-limit';
-import { Control, Discovery } from 'magic-home';
+import { Control } from 'magic-home';
+import MagicLight from './Library/MagicLight';
+import Discovery from './Discovery';
 import { BulbRequest, validateBulbRequest } from './Components/Bulb';
 
 // Setup Application
@@ -39,15 +47,33 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
         const objReq: BulbRequest = req.body;
 
         // Link to Light Bulb
-        const light = new Control(objReq.bulbAddr);
+        const light = new MagicLight(objReq.bulbAddr);
         
         // Check Action
         if (objReq.action === 'setPower') {
-            light.setPower(objReq.actionValue);
+            objReq.actionValue ? light.turnOn() : light.turnOff();
         } 
         else if (objReq.action === 'blink') {
-            light.setPower(objReq.actionValue);
-            setTimeout(() => light.setPower(!objReq.actionValue), objReq.delay | 500);
+            objReq.actionValue ? light.turnOff() : light.turnOn();
+            setTimeout(() => {
+            objReq.actionValue ? light.turnOn() : light.turnOff();
+            }, objReq.delay | 500);
+        }
+        else if(objReq.action === 'rgb') {
+            objReq.actionValue ? light.turnOn() : light.turnOff();
+            light.setRGB(objReq.rgb);
+        }
+        else if(objReq.action === 'setWarm') {
+            light.setWarm(objReq.actionValue as number);
+        }
+        else if(objReq.action === 'setCold') {
+            light.setCold(objReq.actionValue as number);
+        }
+        else {
+            res.send({
+                code: 400,
+                message: `Unknown Action '${objReq.action}'`
+            } as Response);
         }
 
         res.send({
@@ -96,7 +122,6 @@ app.get('/lights', (_, response) => {      // Get Available Light Bulbs
         console.log("Disocvery Failed: ", e);
     }
 });
-
 
 // Start!
 console.log(`Listening to localhost:3000`);
