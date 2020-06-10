@@ -1,16 +1,15 @@
 /**
  * Modified Discovery Library to change the
  *  Bound IP
+ * 
  */
 import { Discovery } from 'magic-home';
 const dgram = require('dgram');
 const os = require('os');
-require('dotenv').config();
 
 
 const DISCOVERY_PORT = 48899;
 const BROADCAST_ADDR = '255.255.255.255';
-// const LOCAL_IP = '10.0.0.1';                // Local IP Address
 
 Discovery.prototype.scan = function(timeout = 500, callback = undefined) {
     let promise = new Promise((resolve, reject) => {
@@ -63,10 +62,12 @@ Discovery.prototype.scan = function(timeout = 500, callback = undefined) {
         socket.bind(DISCOVERY_PORT, process.env.LOCAL_IP);
 
         setTimeout(() => {
-            socket.close();
+            try {
+                socket.close();
 
-            this._scanned = true;
-            resolve(this._clients);
+                this._scanned = true;
+                resolve(this._clients);
+            }catch(e) {console.error(`Timeout Error: ${e}`)}
         }, timeout);
     });
 

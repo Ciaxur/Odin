@@ -3,26 +3,33 @@
  *  - Takes care of all Requests from Nodes
  *      and outside requests to send TO the Nodes
  */
-
 import * as express from 'express';
-import * as bodyParser from 'body-parser';
 import * as cors from 'cors';
 import * as rateLimit from 'express-rate-limit';
+import * as morgan from 'morgan';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as util from 'util';
 import { Control } from 'magic-home';
 import MagicLight from './Library/MagicLight';
 import Discovery from './Discovery';
+import { DataStorage } from './Library/DataStorage';
 import { BulbRequest, validateBulbRequest } from './Components/Bulb';
+require('dotenv').config();
 
 // Setup Application
 const app = express();
-app.use(bodyParser.json({
-    type: 'application/json'
-}))
+app.use(express.json());
 app.use(cors());
 app.use(rateLimit({
     windowMs: 1000,         // 1 Second
     max: 5                  // limit each IP to 100 requests per windowMs
 }));  // Setup Request Limiter
+
+// Setup Middleware Logger
+const fileStream = fs.createWriteStream(path.join(__dirname, 'access.log'), { flags: 'a' });
+app.use(morgan('tiny', { stream: fileStream }));
+
 
 // Default Response Interface
 interface Response {
@@ -30,13 +37,17 @@ interface Response {
     code: number
 };
 
+// HashMap of Stored Bulbs based on IP
+//  - Load Stored Data in
+const storedBulbInfo = [];
+DataStorage.loadBulbData(storedBulbInfo);
 
 
 app.get('/', (request, response) => {   // DEBUG: Debug Request Body
     console.log(request.body);
     
     response.send({
-        "message": "Accepted",
+        "message": util.inspect(storedBulbInfo),
         "code": 200
     });
 });
@@ -90,7 +101,7 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
     }
 });
 
-app.get('/lights', (_, response) => {      // Get Available Light Bulbs
+app.get('/lights', (_, response) => {   // Get Available Light Bulbs
     try {
         Discovery.scan(255).then(res => {
             // Query up Promises for each Address Found
@@ -105,6 +116,8 @@ app.get('/lights', (_, response) => {      // Get Available Light Bulbs
             Promise.all(queries).then(res => {
                 for (const i in res) {
                     devData[i] = {
+                        name: storedBulbInfo[devData[i].address] 
+                            ? storedBulbInfo[devData[i].address].name : undefined,
                         address: devData[i].address,
                         power: res[i].on,
                         color: res[i].color,
@@ -119,7 +132,7 @@ app.get('/lights', (_, response) => {      // Get Available Light Bulbs
         });
     }
     catch(e) {
-        console.log("Disocvery Failed: ", e);
+        console.log("Discovery Failed: ", e);
     }
 });
 
