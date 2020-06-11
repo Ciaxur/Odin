@@ -49,13 +49,8 @@ const storedBulbInfo = [];
 DataStorage.loadBulbData(storedBulbInfo);
 
 
-app.get('/', (request, response) => {   // DEBUG: Debug Request Body
-    console.log(request.body);
-    
-    response.send({
-        "message": util.inspect(storedBulbInfo),
-        "code": 200
-    });
+app.get('/', (request, response) => {   // Redirect to Athens Central Node
+    response.redirect('http://192.168.0.96:8080');
 });
 
 app.post('/config', (req, res) => {     // Configure Bulb Information
@@ -71,13 +66,32 @@ app.post('/config', (req, res) => {     // Configure Bulb Information
                     name: request.value,
                 } as BulbInfo;
             }
+        
+
+        // Handle Unknown Address or Value
+        else {
+            res.json({
+                code: 400,
+                message: `Unknown 'address': '${request.address}'[string] or 'value': '${request.value}'[string]`
+            } as Response);
+        }
             
     }
+
+
+    // Handle Unknown Configure Request
+    else {
+        res.json({
+            code: 400,  // Bad Request
+            message: `Unknown Configuration Request: '${request.configure}'`
+        } as Response);
+    }
+    
 
     // Update File Storage
     DataStorage.updateBulbData(storedBulbInfo);
 
-    // Respond
+    // Respond [Code 200]
     res.json({
         message: "Successfuly Configured!",
         code: 200
@@ -124,6 +138,8 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
         else if(objReq.action === 'setCold') {
             light.setCold(objReq.actionValue as number);
         }
+
+        // Handle Unknown Action
         else {
             res.send({
                 code: 400,
@@ -131,16 +147,20 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
             } as Response);
         }
 
+        // Successful Action
         res.json({
             code: 200,
             message: "Request Success!"
         } as Response);
     }
 
+
+    // Invalid Request Body
     else {
         res.send({
             code: 400,
-            message: "Invalid Request Body"
+            message: "Invalid Request Body: Expected 'action'[string], 'bulbAddr'[string], " +
+                     "and 'actionValue'[boolean/number]."
         } as Response);
     }
 });
@@ -177,6 +197,12 @@ app.get('/lights', (_, response) => {   // Get Available Light Bulbs
     }
     catch(e) {
         console.log("Discovery Failed: ", e);
+
+        // Internal Error
+        response.json({
+            code: 500,  // Internal Server Error
+            message: `Internal Server Error: ${e}`
+        } as Response);
     }
 });
 
