@@ -129,7 +129,6 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
             }, objReq.delay | 500);
         }
         else if(objReq.action === 'rgb') {
-            objReq.actionValue ? light.turnOn() : light.turnOff();
             light.setRGB(objReq.rgb);
         }
         else if(objReq.action === 'setWarm') {
