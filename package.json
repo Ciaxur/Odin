@@ -1,6 +1,7 @@
 {
   "name": "theodinproject",
   "version": "0.0.1",
+  "private": true,
   "description": "The Odin Project, links Nodes to a central REST Device that handles requests between the devices.",
   "main": "src/main.ts",
   "scripts": {
