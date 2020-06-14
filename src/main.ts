@@ -233,9 +233,10 @@ app.post('/node', (req, res) => {       // Handles Node Requests
     else {
         // Store new Node
         if(!nodes[req.hostname]) {
+            const addr = req.connection.remoteAddress.match(/[^:]*$/);
             nodes[req.hostname] = {
                 name: obj.name,
-                address: req.hostname,
+                address: addr ? addr[0] : "",
                 battery: null,
             }
         }
