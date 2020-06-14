@@ -9,12 +9,13 @@ import * as rateLimit from 'express-rate-limit';
 import * as morgan from 'morgan';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as util from 'util';
+import { createSocket } from 'dgram';
 import { Control } from 'magic-home';
 import MagicLight from './Library/MagicLight';
 import Discovery from './Discovery';
 import { DataStorage, BulbInfo } from './Library/DataStorage';
 import { BulbRequest, validateBulbRequest } from './Components/Bulb';
+import { BatteryRequest, NodeCollection } from './Components/Node';
 require('dotenv').config();
 
 // Setup Application
@@ -48,10 +49,16 @@ interface ConfigRequest {
 const storedBulbInfo = [];
 DataStorage.loadBulbData(storedBulbInfo);
 
+// Node Related Data
+const nodes: NodeCollection = {};
+
+
+
 
 app.get('/', (request, response) => {   // Redirect to Athens Central Node
     response.redirect('http://192.168.0.96:8080');
 });
+
 
 app.post('/config', (req, res) => {     // Configure Bulb Information
     const request: ConfigRequest = req.body;
@@ -74,6 +81,7 @@ app.post('/config', (req, res) => {     // Configure Bulb Information
                 code: 400,
                 message: `Unknown 'address': '${request.address}'[string] or 'value': '${request.value}'[string]`
             } as Response);
+            return;
         }
             
     }
@@ -85,6 +93,7 @@ app.post('/config', (req, res) => {     // Configure Bulb Information
             code: 400,  // Bad Request
             message: `Unknown Configuration Request: '${request.configure}'`
         } as Response);
+        return;
     }
     
 
@@ -110,6 +119,7 @@ app.get('/config', (_, res) => {        // Returns the Stored Configuration
         code: 200
     } as Response);
 });
+
 
 app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
     if(validateBulbRequest(req.body)) {
@@ -144,6 +154,7 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
                 code: 400,
                 message: `Unknown Action '${objReq.action}'`
             } as Response);
+            return;
         }
 
         // Successful Action
@@ -204,6 +215,80 @@ app.get('/lights', (_, response) => {   // Get Available Light Bulbs
         } as Response);
     }
 });
+
+
+app.post('/node', (req, res) => {       // Handles Node Requests
+    const obj: BatteryRequest = req.body;
+
+    // No Body or no Data
+    if(!obj || !obj.info || !obj.type || obj.value === null) {
+        res.json({
+            code: 400,
+            message: `Invalid Body! ${obj ? "Expected info, type, and value" : "No Given Body"}.`
+        } as Response);
+        return;
+    }
+
+    // Handle Request
+    else {
+        // Store new Node
+        if(!nodes[req.hostname]) {
+            nodes[req.hostname] = {
+                name: obj.name,
+                address: req.hostname,
+                battery: null,
+            }
+        }
+        
+        
+        // Check for Request Type
+        if(obj.type === 'battery' && obj.info === 'status') {   // Store Battery Value
+            nodes[req.hostname].battery = obj.value;
+        }
+    }
+    
+    res.json({
+        code: 200,
+        message: "Success!"
+    } as Response);
+});
+
+app.get('/node', (_, res) => {          // Returns Current Node Listing
+    // Trigger Stored Nodes to update Battery info
+    const client = createSocket('udp4');
+    for(const key of Object.keys(nodes)) {
+        // Construct Message
+        const msg = {
+            action: "battery"
+        };
+
+        // Send UDP
+        client.send(
+            JSON.stringify(msg),
+            1117,
+            nodes[key].address
+        );
+    }
+    
+    // Compile Stored Nodes into Readable Array
+    const nodeData = [];
+    for(const key of Object.keys(nodes))
+        nodeData.push(nodes[key]);
+
+    // Respond with Configuration Info
+    res.json({
+        message: nodeData,
+        code: 200
+    } as Response);
+});
+
+
+app.all("*", (_, res) => {              // Hanlde Not Found Requests
+    res.json({
+        code: 404,
+        message: "Not Found!"
+    } as Response);
+})
 
 // Start!
 console.log(`Listening to localhost:3000`);
