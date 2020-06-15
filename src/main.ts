@@ -15,7 +15,7 @@ import MagicLight from './Library/MagicLight';
 import Discovery from './Discovery';
 import { DataStorage, BulbInfo } from './Library/DataStorage';
 import { BulbRequest, validateBulbRequest } from './Components/Bulb';
-import { BatteryRequest, NodeCollection } from './Components/Node';
+import { NodeRequest, NodeCollection, CollectionConfig } from './Components/Node';
 require('dotenv').config();
 
 // Setup Application
@@ -218,7 +218,7 @@ app.get('/lights', (_, response) => {   // Get Available Light Bulbs
 
 
 app.post('/node', (req, res) => {       // Handles Node Requests
-    const obj: BatteryRequest = req.body;
+    const obj: NodeRequest = req.body;
 
     // No Body or no Data
     if(!obj || !obj.info || !obj.type || obj.value === null) {
@@ -229,8 +229,99 @@ app.post('/node', (req, res) => {       // Handles Node Requests
         return;
     }
 
-    // Handle Request
-    else {
+    // Node Collection Configuration
+    else if (obj.type === 'node' && (obj.info as CollectionConfig).config) {
+        // Check type of Config
+        const collectionConfig = obj.info as CollectionConfig;
+
+        // Adding new Node to Collection
+        if (collectionConfig.config === 'add') {
+            // Validate there is a Node | Required Address to Store
+            if (!collectionConfig.data || !collectionConfig.data.address) {
+                res.json({
+                    code: 400,
+                    message: `Invalid Node Object for "data"!`
+                } as Response);
+                return;
+            }
+
+            // Append new Node if Unique
+            else if (!nodes[collectionConfig.data.address]){
+                nodes[collectionConfig.data.address] = collectionConfig.data;
+            }
+
+            // Node is already Stored!
+            else {
+                res.json({
+                    code: 400,
+                    message: `Duplicate Node! "${nodes[collectionConfig.data.address].name}" as "${collectionConfig.data.address}."`
+                } as Response);
+                return;
+            }
+        }
+
+        // Modify Node in Collection
+        else if (collectionConfig.config === 'modify') {
+            // Validate there is a Node | Required Address to Store
+            if (!collectionConfig.data || !collectionConfig.data.address) {
+                res.json({
+                    code: 400,
+                    message: `Invalid Node Object for "data"!`
+                } as Response);
+                return;
+            }
+
+            // Update Node
+            else if (nodes[collectionConfig.data.address]) {
+                nodes[collectionConfig.data.address] = collectionConfig.data;
+            }
+
+            // Node Not found
+            else {
+                res.json({
+                    code: 400,
+                    message: `Node "${collectionConfig.data.address}" not Found!`
+                } as Response);
+            }
+        }
+
+        // Remove Node from Collection
+        else if (collectionConfig.config === 'remove') {
+            // Validate there is a Node | Required Address to Store
+            if (!collectionConfig.data || !collectionConfig.data.address) {
+                res.json({
+                    code: 400,
+                    message: `Invalid Node Object for "data"!`
+                } as Response);
+                return;
+            }
+            
+            // Find and Remove Node
+            else if (nodes[collectionConfig.data.address]) {
+                delete nodes[collectionConfig.data.address];
+            }
+
+            // Not Found
+            else {
+                res.json({
+                    code: 400,
+                    message: `Node "${collectionConfig.data.address}" not Found!`
+                } as Response);
+            }
+        }
+
+        // Unknown Config!
+        else {
+            res.json({
+                code: 400,
+                message: `Unknown Config "${collectionConfig.config}".`
+            } as Response);
+            return;
+        }
+    }
+
+    // Store Battery Value
+    else if (obj.type === 'battery' && obj.info === 'status') {
         // Store new Node
         if(!nodes[req.hostname]) {
             const addr = req.connection.remoteAddress.match(/[^:]*$/);
@@ -238,14 +329,23 @@ app.post('/node', (req, res) => {       // Handles Node Requests
                 name: obj.name,
                 address: addr ? addr[0] : "",
                 battery: null,
+                status: 'online'
             }
         }
         
-        
-        // Check for Request Type
-        if(obj.type === 'battery' && obj.info === 'status') {   // Store Battery Value
-            nodes[req.hostname].battery = obj.value;
-        }
+        // Update Data
+        nodes[req.hostname].name = obj.name;            // Update Name
+        nodes[req.hostname].battery = obj.value;        // Update Battery Percentage
+        nodes[req.hostname].status = 'online';          // Replied so Online :)
+    }
+
+    // Unknown Request
+    else {
+        res.json({
+            code: 400,
+            message: `Unknown Request: "${obj.type}"`,
+        } as Response);
+        return;
     }
     
     res.json({
@@ -254,10 +354,19 @@ app.post('/node', (req, res) => {       // Handles Node Requests
     } as Response);
 });
 
-app.get('/node', (_, res) => {          // Returns Current Node Listing
+app.get('/node', (req, res) => {          // Returns Current Node Listing
     // Trigger Stored Nodes to update Battery info
     const client = createSocket('udp4');
+    // Compile Stored Nodes into Readable Array
+    const nodeData = [];
+
     for(const key of Object.keys(nodes)) {
+        // Add to Node Data
+        nodeData.push(nodes[key]);
+
+        // Assume Offline till Reply
+        nodes[key].status = 'offline';
+        
         // Construct Message
         const msg = {
             action: "battery"
@@ -270,17 +379,14 @@ app.get('/node', (_, res) => {          // Returns Current Node Listing
             nodes[key].address
         );
     }
-    
-    // Compile Stored Nodes into Readable Array
-    const nodeData = [];
-    for(const key of Object.keys(nodes))
-        nodeData.push(nodes[key]);
 
     // Respond with Configuration Info
-    res.json({
-        message: nodeData,
-        code: 200
-    } as Response);
+    setTimeout(() => {  // Delay for the Nodes to Reply
+        res.json({
+            message: nodeData,
+            code: 200
+        } as Response);
+    }, 1000);
 });
 
 
