@@ -221,7 +221,7 @@ app.post('/node', (req, res) => {       // Handles Node Requests
     const obj: NodeRequest = req.body;
 
     // No Body or no Data
-    if(!obj || !obj.info || !obj.type || obj.value === null) {
+    if(!obj || (!obj.info && obj.type !== 'led') || !obj.type || obj.value === null) {
         res.json({
             code: 400,
             message: `Invalid Body! ${obj ? "Expected info, type, and value" : "No Given Body"}.`
@@ -334,9 +334,53 @@ app.post('/node', (req, res) => {       // Handles Node Requests
         }
         
         // Update Data
-        nodes[req.hostname].name = obj.name;            // Update Name
-        nodes[req.hostname].battery = obj.value;        // Update Battery Percentage
-        nodes[req.hostname].status = 'online';          // Replied so Online :)
+        nodes[req.hostname].name = obj.name;                // Update Name
+        nodes[req.hostname].battery = obj.value as number;  // Update Battery Percentage
+        nodes[req.hostname].status = 'online';              // Replied so Online :)
+    }
+
+    // Request LED Trigger
+    else if (obj && obj.type === 'led') { 
+        // Validate Requirements
+        if (!(obj.addr && typeof obj.addr === 'string' && typeof obj.value === 'object')) {
+            res.json({
+                code: 401,
+                message: `Data Missing! Object Requires: type, addr, and value (RGB)!`
+            } as Response);
+            return;
+        }
+
+        // Constraint RGB
+        const limit = (val) => Math.min(Math.max(parseInt(val), 0), 255);
+        obj.value.r = limit(obj.value.r);
+        obj.value.g = limit(obj.value.g);
+        obj.value.b = limit(obj.value.b);
+
+
+
+        // Construct and Send Data
+        try {
+            const client = createSocket('udp4');
+
+            // Construct Data
+            const data = {
+                action: 'led',
+                data: obj.value
+            };
+
+            // Send UDP
+            client.send(
+                JSON.stringify(data),
+                1117,
+                obj.addr
+            );
+        } catch(e) {    // Catch any Thrown Exception
+            res.json({
+                code: 400,
+                message: `Error: ${e}`
+            } as Response);
+            return;
+        }
     }
 
     // Unknown Request

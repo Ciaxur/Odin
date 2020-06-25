@@ -2,11 +2,18 @@
  * Node Interfaces and Methods for Connected
  *  Nodes
  */
+interface RGB {
+    r: number,
+    g: number,
+    b: number
+}
+
 export interface NodeRequest {
     name:   string,                         // Name of Node
-    type:   'battery' | 'node',             // Type of Request
+    type:   'battery' | 'node' | 'led',     // Type of Request
     info:   'status' | CollectionConfig     // What about the type?
-    value:  number                          // Value about info
+    value:  number | RGB,                   // Value about info
+    addr?:  string                          // (Optional) Address of Node
 }
 
 
