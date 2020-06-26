@@ -213,17 +213,21 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
 });
 
 app.get('/lights', (req, response) => {   // Get Available Light Bulb Data
+    // Obtain Parameters
+    const type:     string | undefined = req.param('type');
+    const address:  string | undefined = req.param('address');
+    
+    
     // REQUEST: Event Collection based on Address
-    if (req.body &&
-        typeof (req.body as NodeEventRequest).type === 'string' &&
-        (req.body as NodeEventRequest).type === 'event' &&
-        typeof (req.body as NodeEventRequest).address === 'string') {
+    if (typeof  type    === 'string'   &&
+                type    === 'event'    &&
+        typeof address  === 'string') {
 
         // Respond with Event Collection Info
         //  Filter out Object
         response.json({
             code: 200,
-            message: events[req.body.address] ? events[req.body.address].map(e => ({
+            message: events[address] ? events[address].map(e => ({
                 description: e.description,
                 date: e.date,
             })) : [],
@@ -231,10 +235,7 @@ app.get('/lights', (req, response) => {   // Get Available Light Bulb Data
     }
 
     // REQUEST: Entire Event Collection
-    else if (req.body && 
-        typeof (req.body as NodeEventRequest).type === 'string' &&
-        (req.body as NodeEventRequest).type === 'event') {
-
+    else if (typeof type === 'string' && type === 'event') {
         // CLEAN: Clean the Event Collection
         const cleanEvents = {};
         for (const key in events) {
