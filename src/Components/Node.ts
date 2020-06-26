@@ -1,3 +1,6 @@
+import MagicLight from "../Library/MagicLight";
+import { handleLightAction } from "../Library/LightHandler";
+
 /**
  * Node Interfaces and Methods for Connected
  *  Nodes
@@ -33,4 +36,48 @@ export interface Node {
 
 export interface NodeCollection {
     [ipAddr: string]: Node
+}
+
+export interface NodeEvent {
+    timeoutID: NodeJS.Timeout,      // Timeout ID Associated with Event
+    description: string,            // Description of the Event
+    date: Date,                     // Actual Assigned Date of Timeout
+}
+
+export interface NodeEventCollection {
+    [ipAddr: string]: NodeEvent[],        // Maps Node IP to a Stored Event
+}
+
+export interface NodeEventExec {        // Event Execution Object
+    action: 'setPower' | 'blink' | 'rgb' | 'setCold' | 'setWarm',
+    value: RGB | number | boolean,
+}
+
+
+
+/**
+ * Creates a Function based on the Event to Execute
+ *  - Removes Event from Collection after Execution
+ * @param eventExec Event Execute Object
+ * @param light Light to Execute on
+ * @param event Current Event
+ * @param eventCollection Collection of Events
+ */
+export function getEventExec(eventExec: NodeEventExec, lightAddr: string, event: NodeEvent, eventCollection: NodeEventCollection): () => void {
+    return () => {
+        // Construct Bulb Object
+        const light = new MagicLight(lightAddr);
+        
+        // Handle the Request
+        const res = handleLightAction({
+            action: eventExec.action,
+            actionValue: eventExec.value as string | number | boolean | NodeEventExec,
+            rgb: eventExec.value as RGB,
+            bulbAddr: lightAddr,
+        }, light);
+
+        // CLEANUP: REMOVE EVENT FROM COLLECTION
+        if(res)
+            eventCollection[lightAddr] = eventCollection[lightAddr].filter(e => e != event);
+    };
 }

@@ -15,7 +15,16 @@ import MagicLight from './Library/MagicLight';
 import Discovery from './Discovery';
 import { DataStorage, BulbInfo } from './Library/DataStorage';
 import { BulbRequest, validateBulbRequest } from './Components/Bulb';
-import { NodeRequest, NodeCollection, CollectionConfig } from './Components/Node';
+import {
+    NodeRequest,
+    NodeCollection,
+    CollectionConfig,
+    NodeEventCollection,
+    NodeEvent,
+    getEventExec,
+    NodeEventExec,
+} from './Components/Node';
+import { handleLightAction } from './Library/LightHandler';
 require('dotenv').config();
 
 // Setup Application
@@ -51,6 +60,7 @@ DataStorage.loadBulbData(storedBulbInfo);
 
 // Node Related Data
 const nodes: NodeCollection = {};
+const events: NodeEventCollection = {};
 
 
 
@@ -128,24 +138,50 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
         // Link to Light Bulb
         const light = new MagicLight(objReq.bulbAddr);
         
-        // Check Action
-        if (objReq.action === 'setPower') {
-            objReq.actionValue ? light.turnOn() : light.turnOff();
-        } 
-        else if (objReq.action === 'blink') {
-            objReq.actionValue ? light.turnOff() : light.turnOn();
-            setTimeout(() => {
-            objReq.actionValue ? light.turnOn() : light.turnOff();
-            }, objReq.delay | 500);
-        }
-        else if(objReq.action === 'rgb') {
-            light.setRGB(objReq.rgb);
-        }
-        else if(objReq.action === 'setWarm') {
-            light.setWarm(objReq.actionValue as number);
-        }
-        else if(objReq.action === 'setCold') {
-            light.setCold(objReq.actionValue as number);
+        // LIGHT: Handle Light Action
+        if(handleLightAction(objReq, light)) {}
+
+        // EVENT: Add/Remove Light Event Timer
+        else if(objReq.action === 'event') {
+            // Interpret Date Object
+            objReq.eventTime = new Date(objReq.eventTime);
+            
+            // Validate Event Date Object is Given
+            if(!objReq.eventTime || isNaN(objReq.eventTime.getTime())) {
+                res.send({
+                    code: 400,
+                    message: `Value for key 'eventTime' was invalid! Date Object Required!`
+                } as Response);
+                return;
+            }
+
+            // INVALID: Date is Old
+            if(objReq.eventTime.getTime() < Date.now()) {
+                res.send({
+                    code: 400,
+                    message: `Value for key 'eventTime' is in the Past! Cannot Comply :(`
+                } as Response);
+                return;
+            }
+
+            // Construct Event Object
+            //      TODO: Remove Event from Collection when Expires
+            const e: NodeEvent = {
+                date: objReq.eventTime,
+                description: objReq.description,
+                timeoutID: null
+            };
+
+            // Construct the Timeout with Cleanup afterwards
+            e.timeoutID = setTimeout(getEventExec(objReq.actionValue as NodeEventExec, objReq.bulbAddr, e, events),
+                objReq.eventTime.getTime() - Date.now(),
+            )
+            
+            // Store Event Mapped to Current Node
+            if(events[objReq.bulbAddr])
+                events[objReq.bulbAddr].push(e);
+            else
+                events[objReq.bulbAddr] = [e];
         }
 
         // Handle Unknown Action
