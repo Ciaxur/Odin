@@ -53,6 +53,12 @@ export interface NodeEventExec {        // Event Execution Object
     value: RGB | number | boolean,
 }
 
+// Node Event Data Request
+export interface NodeEventRequest { // NOTE: Add more later :)
+    type: 'event',          // Request Type
+    address?: string,        // Node Address
+}
+
 
 
 /**

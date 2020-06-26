@@ -23,8 +23,10 @@ import {
     NodeEvent,
     getEventExec,
     NodeEventExec,
+    NodeEventRequest,
 } from './Components/Node';
 import { handleLightAction } from './Library/LightHandler';
+import e = require('express');
 require('dotenv').config();
 
 // Setup Application
@@ -165,14 +167,13 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
             }
 
             // Construct Event Object
-            //      TODO: Remove Event from Collection when Expires
             const e: NodeEvent = {
                 date: objReq.eventTime,
                 description: objReq.description,
                 timeoutID: null
             };
 
-            // Construct the Timeout with Cleanup afterwards
+            // CLEAN: Construct the Timeout with Cleanup afterwards
             e.timeoutID = setTimeout(getEventExec(objReq.actionValue as NodeEventExec, objReq.bulbAddr, e, events),
                 objReq.eventTime.getTime() - Date.now(),
             )
@@ -211,44 +212,87 @@ app.post('/lights', (req, res) => {     // Perform Action on Light Bulb
     }
 });
 
-app.get('/lights', (_, response) => {   // Get Available Light Bulbs
-    try {
-        Discovery.scan(255).then(res => {
-            // Query up Promises for each Address Found
-            const devData = [];
-            const queries = [];
-            for (const dev of res) {
-                devData.push({ address: dev.address });
-                queries.push(new Control(dev.address).queryState());
-            }
+app.get('/lights', (req, response) => {   // Get Available Light Bulb Data
+    // REQUEST: Event Collection based on Address
+    if (req.body &&
+        typeof (req.body as NodeEventRequest).type === 'string' &&
+        (req.body as NodeEventRequest).type === 'event' &&
+        typeof (req.body as NodeEventRequest).address === 'string') {
 
-            // Compile all Results into a single Object Array
-            Promise.all(queries).then(res => {
-                for (const i in res) {
-                    devData[i] = {
-                        name: storedBulbInfo[devData[i].address] 
-                            ? storedBulbInfo[devData[i].address].name : undefined,
-                        address: devData[i].address,
-                        power: res[i].on,
-                        color: res[i].color,
-                        warm_white: res[i].warm_white,
-                        cold_white: res[i].cold_white
-                    };
+        // Respond with Event Collection Info
+        //  Filter out Object
+        response.json({
+            code: 200,
+            message: events[req.body.address] ? events[req.body.address].map(e => ({
+                description: e.description,
+                date: e.date,
+            })) : [],
+        } as Response);
+    }
+
+    // REQUEST: Entire Event Collection
+    else if (req.body && 
+        typeof (req.body as NodeEventRequest).type === 'string' &&
+        (req.body as NodeEventRequest).type === 'event') {
+
+        // CLEAN: Clean the Event Collection
+        const cleanEvents = {};
+        for (const key in events) {
+            cleanEvents[key] = events[key].map(e => ({
+                description: e.description,
+                date: e.date,
+            }));
+        }
+            
+        // RESPONSE: Respond with Data
+        response.json({
+            code: 200,
+            message: cleanEvents,
+        } as Response);
+    }
+
+    
+
+    // GET: Available Lights
+    else {
+        try {
+            Discovery.scan(255).then(res => {
+                // Query up Promises for each Address Found
+                const devData = [];
+                const queries = [];
+                for (const dev of res) {
+                    devData.push({ address: dev.address });
+                    queries.push(new Control(dev.address).queryState());
                 }
 
-                // Respond back
-                response.send(devData);
-            });
-        });
-    }
-    catch(e) {
-        console.log("Discovery Failed: ", e);
+                // Compile all Results into a single Object Array
+                Promise.all(queries).then(res => {
+                    for (const i in res) {
+                        devData[i] = {
+                            name: storedBulbInfo[devData[i].address] 
+                                ? storedBulbInfo[devData[i].address].name : undefined,
+                            address: devData[i].address,
+                            power: res[i].on,
+                            color: res[i].color,
+                            warm_white: res[i].warm_white,
+                            cold_white: res[i].cold_white
+                        };
+                    }
 
-        // Internal Error
-        response.json({
-            code: 500,  // Internal Server Error
-            message: `Internal Server Error: ${e}`
-        } as Response);
+                    // Respond back
+                    response.send(devData);
+                });
+            });
+        }
+        catch(e) {
+            console.log("Discovery Failed: ", e);
+
+            // Internal Error
+            response.json({
+                code: 500,  // Internal Server Error
+                message: `Internal Server Error: ${e}`
+            } as Response);
+        }
     }
 });
 
