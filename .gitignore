@@ -1,6 +1,7 @@
 # Project Related
 .vscode
 node_modules
+.env
 
 # Build Directories
 out
