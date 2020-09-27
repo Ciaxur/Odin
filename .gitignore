@@ -1,7 +1,10 @@
 # Project Related
 .vscode
 node_modules
+
+# Settings
 .env
+ap_config
 
 # Build Directories
 out

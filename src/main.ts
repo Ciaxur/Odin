@@ -36,7 +36,7 @@ app.use(cors());
 app.use(
   rateLimit({
     windowMs: 1000, // 1 Second
-    max: 5, // limit each IP to 100 requests per windowMs
+    max: 100, // limit each IP to 100 requests per windowMs
   })
 ); // Setup Request Limiter
 
@@ -94,7 +94,7 @@ app.post('/config', (req, res) => {
 
     // Handle Unknown Address or Value
     else {
-      res.json({
+      res.status(400).json({
         code: 400,
         message: `Unknown 'address': '${request.address}'[string] or 'value': '${request.value}'[string]`,
       } as Response);
@@ -104,7 +104,7 @@ app.post('/config', (req, res) => {
 
   // Handle Unknown Configure Request
   else {
-    res.json({
+    res.status(400).json({
       code: 400, // Bad Request
       message: `Unknown Configuration Request: '${request.configure}'`,
     } as Response);
@@ -115,7 +115,7 @@ app.post('/config', (req, res) => {
   DataStorage.updateBulbData(storedBulbInfo);
 
   // Respond [Code 200]
-  res.json({
+  res.status(200).json({
     message: 'Successfuly Configured!',
     code: 200,
   } as Response);
@@ -129,7 +129,7 @@ app.get('/config', (_, res) => {
     config.push(storedBulbInfo[key]);
 
   // Respond with Configuration Info
-  res.json({
+  res.status(200).json({
     message: config,
     code: 200,
   } as Response);
@@ -154,7 +154,7 @@ app.post('/lights', (req, res) => {
 
       // Validate Event Date Object is Given
       if (!objReq.eventTime || isNaN(objReq.eventTime.getTime())) {
-        res.send({
+        res.status(400).json({
           code: 400,
           message: `Value for key 'eventTime' was invalid! Date Object Required!`,
         } as Response);
@@ -163,7 +163,7 @@ app.post('/lights', (req, res) => {
 
       // INVALID: Date is Old
       if (objReq.eventTime.getTime() < Date.now()) {
-        res.send({
+        res.status(400).json({
           code: 400,
           message: `Value for key 'eventTime' is in the Past! Cannot Comply :(`,
         } as Response);
@@ -195,7 +195,7 @@ app.post('/lights', (req, res) => {
 
     // Handle Unknown Action
     else {
-      res.send({
+      res.status(400).json({
         code: 400,
         message: `Unknown Action '${objReq.action}'`,
       } as Response);
@@ -203,7 +203,7 @@ app.post('/lights', (req, res) => {
     }
 
     // Successful Action
-    res.json({
+    res.status(400).json({
       code: 200,
       message: 'Request Success!',
     } as Response);
@@ -211,7 +211,7 @@ app.post('/lights', (req, res) => {
 
   // Invalid Request Body
   else {
-    res.send({
+    res.status(400).json({
       code: 400,
       message:
         "Invalid Request Body: Expected 'action'[string], 'bulbAddr'[string], " +
@@ -223,8 +223,9 @@ app.post('/lights', (req, res) => {
 app.get('/lights', (req, response) => {
   // Get Available Light Bulb Data
   // Obtain Parameters
-  const type: string | undefined = req.param('type');
-  const address: string | undefined = req.param('address');
+  const { type, address } = req.params;
+  // const type: string | undefined = req.param('type');
+  // const address: string | undefined = req.param('address');
 
   // REQUEST: Event Collection based on Address
   if (
@@ -234,7 +235,7 @@ app.get('/lights', (req, response) => {
   ) {
     // Respond with Event Collection Info
     //  Filter out Object
-    response.json({
+    response.status(200).json({
       code: 200,
       message: events[address]
         ? events[address].map((e) => ({
@@ -257,7 +258,7 @@ app.get('/lights', (req, response) => {
     }
 
     // RESPONSE: Respond with Data
-    response.json({
+    response.status(200).json({
       code: 200,
       message: cleanEvents,
     } as Response);
@@ -291,14 +292,23 @@ app.get('/lights', (req, response) => {
           }
 
           // Respond back
-          response.send(devData);
+          response.status(200).send(devData);
+        })
+        .catch(e => {
+          console.log('GET Lights Query Error:', e);
+          response.status(400).json({
+            code: 400,
+            message: 'Lights Query Error' + e,
+          });
         });
+
+        
       });
     } catch (e) {
       console.log('Discovery Failed: ', e);
 
       // Internal Error
-      response.json({
+      response.status(500).json({
         code: 500, // Internal Server Error
         message: `Internal Server Error: ${e}`,
       } as Response);
@@ -317,7 +327,7 @@ app.post('/node', (req, res) => {
     !obj.type ||
     obj.value === null
   ) {
-    res.json({
+    res.status(400).json({
       code: 400,
       message: `Invalid Body! ${
         obj ? 'Expected info, type, and value' : 'No Given Body'
@@ -335,7 +345,7 @@ app.post('/node', (req, res) => {
     if (collectionConfig.config === 'add') {
       // Validate there is a Node | Required Address to Store
       if (!collectionConfig.data || !collectionConfig.data.address) {
-        res.json({
+        res.status(400).json({
           code: 400,
           message: `Invalid Node Object for "data"!`,
         } as Response);
@@ -349,7 +359,7 @@ app.post('/node', (req, res) => {
 
       // Node is already Stored!
       else {
-        res.json({
+        res.status(400).json({
           code: 400,
           message: `Duplicate Node! "${
             nodes[collectionConfig.data.address].name
@@ -363,7 +373,7 @@ app.post('/node', (req, res) => {
     else if (collectionConfig.config === 'modify') {
       // Validate there is a Node | Required Address to Store
       if (!collectionConfig.data || !collectionConfig.data.address) {
-        res.json({
+        res.status(400).json({
           code: 400,
           message: `Invalid Node Object for "data"!`,
         } as Response);
@@ -377,7 +387,7 @@ app.post('/node', (req, res) => {
 
       // Node Not found
       else {
-        res.json({
+        res.status(400).json({
           code: 400,
           message: `Node "${collectionConfig.data.address}" not Found!`,
         } as Response);
@@ -388,7 +398,7 @@ app.post('/node', (req, res) => {
     else if (collectionConfig.config === 'remove') {
       // Validate there is a Node | Required Address to Store
       if (!collectionConfig.data || !collectionConfig.data.address) {
-        res.json({
+        res.status(400).json({
           code: 400,
           message: `Invalid Node Object for "data"!`,
         } as Response);
@@ -402,7 +412,7 @@ app.post('/node', (req, res) => {
 
       // Not Found
       else {
-        res.json({
+        res.status(400).json({
           code: 400,
           message: `Node "${collectionConfig.data.address}" not Found!`,
         } as Response);
@@ -411,7 +421,7 @@ app.post('/node', (req, res) => {
 
     // Unknown Config!
     else {
-      res.json({
+      res.status(400).json({
         code: 400,
         message: `Unknown Config "${collectionConfig.config}".`,
       } as Response);
@@ -448,7 +458,7 @@ app.post('/node', (req, res) => {
         typeof obj.value === 'object'
       )
     ) {
-      res.json({
+      res.status(401).json({
         code: 401,
         message: `Data Missing! Object Requires: type, addr, and value (RGB)!`,
       } as Response);
@@ -475,7 +485,7 @@ app.post('/node', (req, res) => {
       client.send(JSON.stringify(data), 1117, obj.addr);
     } catch (e) {
       // Catch any Thrown Exception
-      res.json({
+      res.status(400).json({
         code: 400,
         message: `Error: ${e}`,
       } as Response);
@@ -485,14 +495,14 @@ app.post('/node', (req, res) => {
 
   // Unknown Request
   else {
-    res.json({
+    res.status(400).json({
       code: 400,
       message: `Unknown Request: "${obj.type}"`,
     } as Response);
     return;
   }
 
-  res.json({
+  res.status(200).json({
     code: 200,
     message: 'Success!',
   } as Response);
@@ -524,7 +534,7 @@ app.get('/node', (req, res) => {
   // Respond with Configuration Info
   setTimeout(() => {
     // Delay for the Nodes to Reply
-    res.json({
+    res.status(200).json({
       message: nodeData,
       code: 200,
     } as Response);
@@ -533,7 +543,7 @@ app.get('/node', (req, res) => {
 
 app.all('*', (_, res) => {
   // Hanlde Not Found Requests
-  res.json({
+  res.status(404).json({
     code: 404,
     message: 'Not Found!',
   } as Response);

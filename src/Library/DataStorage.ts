@@ -12,19 +12,30 @@ interface BulbInfo {
 }
 
 class DataStorage {
+  // Default File Path
+  private static filePath: string = path.join(__dirname, 'bulbInfo.json');
+  
   /**
    * Loads Bulb Data from Pre-Set File
    * @param obj - Object to store data to
    */
   static loadBulbData(obj) {
     fs.readFile(
-      path.join(__dirname, 'bulbInfo.json'),
+      this.filePath,
       { encoding: 'utf-8' },
       (err, res) => {
         if (err) {
           // No File
           console.error(`Error Reading File: ${err}`);
-          return 1;
+          
+          // Create File
+          return fs.writeFile(
+            this.filePath,
+            JSON.stringify([{}]),
+            { encoding: 'utf-8' }, (err) => {
+              if (err) console.log('Error Creating File:', err);
+              return 1;
+            });
         }
 
         // Store Parsed Data
