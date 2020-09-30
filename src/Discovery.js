@@ -11,7 +11,7 @@ const DISCOVERY_PORT = 48899;
 const BROADCAST_ADDR = '255.255.255.255';
 
 Discovery.prototype.scan = function (timeout = 500, callback = undefined) {
-  let promise = new Promise((resolve, reject) => {
+  const promise = new Promise((resolve, reject) => {
     let socket = dgram.createSocket('udp4');
 
     let addresses = [];
@@ -38,8 +38,9 @@ Discovery.prototype.scan = function (timeout = 500, callback = undefined) {
     }
 
     socket.on('error', (err) => {
-      socket.close();
-      reject(err);
+      socket.close(() => {
+        reject(err);
+      });
     });
 
     socket.on('message', (msg, rinfo) => {
@@ -62,18 +63,22 @@ Discovery.prototype.scan = function (timeout = 500, callback = undefined) {
       );
     });
 
-    socket.bind(DISCOVERY_PORT, process.env.LOCAL_IP);
+    socket.bind(DISCOVERY_PORT, process.env.LOCAL_IP, () => {
 
-    setTimeout(() => {
-      try {
-        socket.close();
+      setTimeout(() => {
+        try {
+          socket.close(() => {
+            console.log('Discovery::Scan: Socket Closed');
 
-        this._scanned = true;
-        resolve(this._clients);
-      } catch (e) {
-        console.error(`Timeout Error: ${e}`);
-      }
-    }, timeout);
+            this._scanned = true;
+            resolve(this._clients);
+          });
+        } catch (e) {
+          console.error('Discovery::Scan Error: Timeout');
+        }
+      }, timeout);
+    });
+  
   });
 
   if (callback && typeof callback == 'function') {

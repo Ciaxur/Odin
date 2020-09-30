@@ -203,7 +203,7 @@ app.post('/lights', (req, res) => {
     }
 
     // Successful Action
-    res.status(400).json({
+    res.status(200).json({
       code: 200,
       message: 'Request Success!',
     } as Response);
