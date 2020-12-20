@@ -7,13 +7,13 @@ import { Discovery } from 'magic-home';
 const dgram = require('dgram');
 const os = require('os');
 
-const DISCOVERY_PORT = 48899;
+const ORIG_PORT = 48899;
+let DISCOVERY_PORT = ORIG_PORT;
 const BROADCAST_ADDR = '255.255.255.255';
 
 Discovery.prototype.scan = function (timeout = 500, callback = undefined) {
   const promise = new Promise((resolve, reject) => {
     let socket = dgram.createSocket('udp4');
-
     let addresses = [];
 
     if (os.platform() == 'win32') {
@@ -38,9 +38,17 @@ Discovery.prototype.scan = function (timeout = 500, callback = undefined) {
     }
 
     socket.on('error', (err) => {
-      socket.close(() => {
-        reject(err);
-      });
+      console.log('Socket Error:', err);
+      if (err.code !== 'EADDRNOTAVAIL') {
+        socket.close(() => {
+            reject(err);
+        }); 
+      } else { // Increment the PORT
+          if (DISCOVERY_PORT >= 49000)
+            DISCOVERY_PORT = ORIG_PORT;
+          else
+            DISCOVERY_PORT++;
+      }
     });
 
     socket.on('message', (msg, rinfo) => {
