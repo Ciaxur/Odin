@@ -17,7 +17,7 @@
   "devDependencies": {
     "@types/express": "^4.17.6",
     "@types/morgan": "^1.9.0",
-    "nodemon": "^2.0.4",
+    "nodemon": "^2.0.20",
     "typescript": "^3.9.5"
   },
   "dependencies": {
